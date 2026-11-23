@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Reel Room — play-money slots</title>
+  <meta name="description" content="Four original play-money slot games. No real money, ever." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎰</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- AUTH -->
+  <section id="auth" class="screen hidden">
+    <div class="auth-card">
+      <h1 class="logo">REEL<span>ROOM</span></h1>
+      <p class="tag">Four original slots. Play money only.</p>
+      <form id="auth-form" autocomplete="on">
+        <input id="username" name="username" placeholder="Username" autocomplete="username" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" />
+        <input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" required minlength="6" />
+        <button type="submit" id="auth-submit" class="btn gold">Sign in</button>
+        <button type="button" id="auth-toggle" class="link">New here? Create an account</button>
+        <p id="auth-error" class="error"></p>
+      </form>
+      <p class="fine">New accounts start with 10,000 free coins. Coins have no cash value and can't be bought or cashed out.</p>
+    </div>
+  </section>
+
+  <!-- APP -->
+  <section id="app" class="screen hidden">
+    <header class="topbar">
+      <button id="home-btn" class="logo small">REEL<span>ROOM</span></button>
+      <div class="balance-wrap">
+        <span class="coin-ico">🪙</span><span id="balance">0</span>
+      </div>
+      <div class="top-actions">
+        <button id="bonus-btn" class="btn small green">Free coins</button>
+        <button id="board-btn" class="btn small ghost" title="Leaderboard">🏆</button>
+        <button id="sound-btn" class="btn small ghost" title="Sound">🔊</button>
+        <button id="signout-btn" class="btn small ghost" title="Sign out">⎋</button>
+      </div>
+    </header>
+
+    <main id="lobby">
+      <h2 class="hello">Hey <span id="hello-name"></span>, pick a machine</h2>
+      <div class="games" id="game-list"></div>
+      <p class="fine center">Play money only · no purchases · no cash value · RTP ≈ 95% (simulated over 1M spins)</p>
+    </main>
+
+    <main id="game" class="hidden">
+      <div class="game-head">
+        <button id="back-btn" class="btn small ghost">← Lobby</button>
+        <h2 id="game-title"></h2>
+        <button id="info-btn" class="btn small ghost">ⓘ Rules</button>
+      </div>
+      <div id="feature-bar" class="feature-bar"></div>
+      <div class="machine">
+        <div id="reels" class="reels"></div>
+        <div id="overlay" class="overlay hidden"></div>
+      </div>
+      <div class="win-line"><span id="win-label">WIN</span> <span id="win-amount">0</span></div>
+      <div class="controls">
+        <div class="bet">
+          <button id="bet-down" class="btn round">−</button>
+          <div class="bet-val"><small>BET</small><span id="bet">100</span></div>
+          <button id="bet-up" class="btn round">+</button>
+        </div>
+        <button id="spin-btn" class="spin">SPIN</button>
+        <div class="toggles">
+          <button id="auto-btn" class="btn small ghost">Auto 10</button>
+          <button id="turbo-btn" class="btn small ghost">Turbo</button>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <div id="modal" class="modal hidden"><div class="modal-card"><button class="modal-x" id="modal-x">✕</button><div id="modal-body"></div></div></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
