@@ -408,3 +408,25 @@ export function play(gameId, rng = cryptoRng) {
   r.total = Math.min(r.total, MAX_WIN);
   return r;
 }
+
+/* ------------------------------------------------------------------ */
+/* Bonus buy: pay a fixed multiple of the bet for a spin that is       */
+/* guaranteed to trigger the feature. Rejection sampling keeps the     */
+/* feature's distribution identical to a naturally triggered one.      */
+/* ------------------------------------------------------------------ */
+export const HAS_FEATURE = {
+  'wrapped-riches': (r) => !!r.walk,
+  'sugar-storm': (r) => r.fsAwarded > 0,
+  'prism-pop': (r) => !!r.picks,
+  'thunder-vault': (r) => !!r.hold,
+};
+// Price in multiples of bet. Set from sim/buy.mjs so a bought bonus returns ~95-96%.
+export const BUY_PRICE = { 'wrapped-riches': 49, 'sugar-storm': 52, 'prism-pop': 34, 'thunder-vault': 70 };
+export function buyFeature(gameId, rng = cryptoRng) {
+  const fn = GAMES[gameId], has = HAS_FEATURE[gameId];
+  for (let i = 0; i < 50000; i++) {
+    const r = fn(rng);
+    if (has(r)) { r.total = Math.min(r.total, MAX_WIN); r.bought = true; return r; }
+  }
+  throw new Error('feature_not_found');
+}

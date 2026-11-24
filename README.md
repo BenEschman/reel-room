@@ -17,6 +17,7 @@ Four original **play-money** slot games: no real money, no purchases, and coins 
   - `spins`: spin history (each user can read their own)
   - Edge function `spin`: runs the game math **server-side** (`supabase/functions/spin/engine.js`) and settles the balance atomically through the `settle_spin()` RPC, which only the service role can call. The client only animates the result
   - Edge function `signup`: username + password accounts, no email needed
+  - Bonus buy: `{ buy: true }` on `spin` charges `BUY_PRICE[game] × bet` and returns a guaranteed feature (rejection-sampled, so it matches a natural trigger). Prices from `sim/buy.mjs`
   - RPC `claim_bonus()`: +5,000 free coins every 4 hours
   - RPC `admin_add_coins(username, amount)`: admins only (`profiles.is_admin`), logged in `coin_grants`
 

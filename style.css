@@ -272,3 +272,8 @@ td.pi .gem { width: 22px; margin: auto; }
 .cp-tile.dim { opacity: .35; animation: none; }
 .cp-tile.win { animation: hit .6s ease-in-out infinite alternate; box-shadow: inset 0 0 0 3px currentColor, 0 0 24px currentColor; }
 @keyframes flip { from { transform: rotateY(90deg); } }
+.btn.buy { background: linear-gradient(180deg, #ff6bd6, #a42fd0); color: #fff; line-height: 1.15; }
+.btn.buy small { font-size: 10px; opacity: .9; }
+body.busy #buy-btn { opacity: .4; pointer-events: none; }
+.buy-cost { font-family: Bungee, sans-serif; font-size: 30px; color: var(--accent); margin: 8px 0; }
+#buy-confirm { width: 100%; }

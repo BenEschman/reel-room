@@ -496,6 +496,13 @@ const thunderVault = {
   },
 };
 
+export const BUY = {
+  'wrapped-riches': { price: 49, name: 'Mummy Walk' },
+  'sugar-storm': { price: 52, name: '10 Free Spins with bombs' },
+  'prism-pop': { price: 34, name: 'Crystal Picks' },
+  'thunder-vault': { price: 70, name: 'Hold & Spin' },
+};
+
 export const GAMES = {
   'wrapped-riches': wrappedRiches,
   'sugar-storm': sugarStorm,

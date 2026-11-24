@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
-import { GAMES, LINES20 } from './games.js';
+import { GAMES, LINES20, BUY } from './games.js';
 
 const SUPABASE_URL = 'https://fnndsroudkrwrgnjgekr.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_g2mVr3w9WTpd5UrqsUrCIw_hDL6NOPO';
@@ -72,7 +72,10 @@ function setBalance(n, animate = false) {
   requestAnimationFrame(step);
 }
 const bet = () => BETS[state.betIdx];
-function renderBet() { $('bet').textContent = fmt(bet()); }
+function renderBet() {
+  $('bet').textContent = fmt(bet());
+  if (state.game) $('buy-price').textContent = fmt(BUY[state.game].price * bet());
+}
 
 /* ---------------- auth ---------------- */
 let signupMode = false;
@@ -228,6 +231,7 @@ function openGame(id) {
   setGrid(start);
   setWin(0, 'WIN');
   hideOverlay();
+  renderBet();
 }
 
 /* ---------------- reels ---------------- */
@@ -364,10 +368,11 @@ const ctx = {
   hideBonus() { $('bonus').classList.add('hidden'); $('bonus').innerHTML = ''; $('reels').classList.remove('hidden'); },
 };
 
-async function doSpin() {
+async function doSpin(buy = false) {
   if (state.busy || !state.game) return;
   const b = bet();
-  if (state.balance < b) {
+  const cost = buy ? BUY[state.game].price * b : b;
+  if (state.balance < cost) {
     state.autoLeft = 0; renderAuto();
     return toast(state.balance < BETS[0] ? 'Out of coins — grab your free coins up top' : 'Not enough coins for that bet');
   }
@@ -378,7 +383,7 @@ async function doSpin() {
   setWinNote('');
   hideOverlay();
   clearHighlight();
-  setBalance(state.balance - b);
+  setBalance(state.balance - cost);
   // start spinning visually while we wait for the server
   const g = GAMES[gameId];
   let waiting = true;
@@ -388,12 +393,12 @@ async function doSpin() {
   }, 60);
   let res;
   try {
-    const { data, error } = await sb.functions.invoke('spin', { body: { game: gameId, bet: b } });
+    const { data, error } = await sb.functions.invoke('spin', { body: { game: gameId, bet: b, buy } });
     if (error) throw new Error(await fnError(error));
     res = data;
   } catch (err) {
     waiting = false; clearInterval(blur);
-    setBalance(state.balance + b);
+    setBalance(state.balance + cost);
     setGrid(Array.from({ length: g.cols }, (_, c) => Array.from({ length: g.rows }, () => g.randomCell(c))));
     toast(err.message === 'insufficient_balance' ? 'Not enough coins' : 'Spin failed — try again');
     state.busy = false; document.body.classList.remove('busy'); state.autoLeft = 0; renderAuto();
@@ -438,6 +443,18 @@ function renderToggles() {
 }
 $('turbo-btn').onclick = () => { state.turbo = !state.turbo; store.set('turbo', state.turbo); renderToggles(); };
 $('sound-btn').onclick = () => { state.sound = !state.sound; store.set('sound', state.sound); renderToggles(); };
+$('buy-btn').onclick = () => {
+  if (state.busy || !state.game) return;
+  state.autoLeft = 0; renderAuto();
+  const info = BUY[state.game];
+  const cost = info.price * bet();
+  modal(`<h3>Buy bonus</h3>
+    <p>Skip straight to <b>${info.name}</b>.</p>
+    <p class="buy-cost">🪙 ${fmt(cost)}</p>
+    <p class="fine">${info.price}× your ${fmt(bet())} bet. Bought bonuses pay back about 96% on average, the same as regular spins. Change your bet to change the price.</p>
+    <button id="buy-confirm" class="btn gold" ${state.balance < cost ? 'disabled' : ''}>${state.balance < cost ? 'Not enough coins' : 'Buy for ' + fmt(cost)}</button>`);
+  $('buy-confirm').onclick = () => { $('modal').classList.add('hidden'); doSpin(true); };
+};
 $('info-btn').onclick = () => modal(GAMES[state.game].rules(bet()));
 
 renderBet(); renderToggles(); renderAuto();
