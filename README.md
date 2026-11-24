@@ -4,9 +4,9 @@ Four original **play-money** slot games: no real money, no purchases, and coins 
 
 | Game | Mechanic |
 |---|---|
-| **Wrapped Riches** | Egyptian 5×3, 20 lines. Cash-value coins, a scarab collector on reel 5, and free spins with doubled collects |
+| **Wrapped Riches** | Egyptian 5×3, 20 lines. Scarab collects coins; 3 pyramids start **Mummy Walk** — a mummy roams a 6×5 tomb eating coins, growing 1×1 → 4×4 with diamonds |
 | **Sugar Storm** | 6×5 scatter pays (8+ anywhere), tumbles, and multiplier bombs in free spins |
-| **Prism Pop** | 10 lines that pay both ways, plus expanding star wilds that lock and respin |
+| **Prism Pop** | 10 lines both ways, expanding star wilds with respins; 3 prisms start **Crystal Picks** (match 3 jackpots) |
 | **Thunder Vault** | Hold & Spin with MINI / MINOR / MAJOR / GRAND jackpots |
 
 ## Architecture
@@ -18,6 +18,7 @@ Four original **play-money** slot games: no real money, no purchases, and coins 
   - Edge function `spin`: runs the game math **server-side** (`supabase/functions/spin/engine.js`) and settles the balance atomically through the `settle_spin()` RPC, which only the service role can call. The client only animates the result
   - Edge function `signup`: username + password accounts, no email needed
   - RPC `claim_bonus()`: +5,000 free coins every 4 hours
+  - RPC `admin_add_coins(username, amount)`: admins only (`profiles.is_admin`), logged in `coin_grants`
 
 ## Math
 

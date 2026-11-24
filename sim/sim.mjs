@@ -9,7 +9,7 @@ for (const [id, fn] of Object.entries(GAMES)) {
     const t = Math.min(r.total, MAX_WIN);
     total += t; sq += t * t;
     if (t > 0) hits++;
-    if (r.fsAwarded || r.hold || (r.spins && r.spins.length > 1)) feats++;
+    if (r.fsAwarded || r.hold || r.walk || r.picks) feats++;
     if (t > max) max = t;
   }
   const rtp = total / N;

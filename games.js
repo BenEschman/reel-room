@@ -28,9 +28,9 @@ const PYRAMID_SVG = `<svg viewBox="0 0 64 64" class="svg-sym"><defs><linearGradi
 /* ================================================================== */
 const wrappedRiches = {
   name: 'Wrapped Riches',
-  blurb: 'Egyptian 5×3, 20 lines. Gold coins carry cash values — land a scarab on reel 5 to collect them all.',
-  tags: ['Cash Collect', 'Free Spins', 'Jackpot coins'],
-  tagline: 'Scarab on reel 5 collects every coin · 3 pyramids = 10 free spins',
+  blurb: 'Egyptian 5×3, 20 lines. Scarabs collect coins, and 3 pyramids release a mummy that roams the tomb eating coins and growing with every diamond.',
+  tags: ['Cash Collect', 'Mummy Walk bonus', 'Growing collector'],
+  tagline: 'Scarab on reel 5 collects every coin · 3 pyramids = Mummy Walk bonus',
   cover: `<div class="cover-row">${MUMMY_SVG}<span class="big-emoji">🪲</span></div>`,
   cols: 5, rows: 3,
   symName: (s) => ({ mask: 'Pharaoh', ankh: 'Ankh', cat: 'Cat', wild: 'Mummy' }[s] || s),
@@ -61,47 +61,151 @@ const wrappedRiches = {
     const icon = { mask: '👑', ankh: '☥', cat: '🐈‍⬛', A: 'A', K: 'K', Q: 'Q', J: 'J' };
     return `<h3>Wrapped Riches</h3>
     <p><b>Coins</b> land on any reel showing a cash value. When a <b>🪲 Scarab</b> lands on reel 5, it collects the value of every coin on screen. Jackpot coins: MINI = 25× bet, MAJOR = 100× bet.</p>
-    <p><b>Mummy</b> is wild on reels 2–4. <b>3+ Pyramids</b> (reels 1, 3, 5) pay 2× / 5× / 20× bet and award <b>10 free spins</b>: coins land more often, coin collects are <b>doubled</b>, and scarabs can land on reels 3–5 (each scarab collects separately). 3 pyramids during free spins = +5 spins.</p>
+    <p><b>Mummy</b> is wild on reels 2–4. <b>3 Pyramids</b> (reels 1, 3, 5) pay 2× bet and open the <b>Mummy Walk</b> bonus.</p>
+    <p><b>Mummy Walk:</b> a 6×5 tomb fills with coins. Each move, new coins, 💎 diamonds and ☥ ankhs drop in, and the mummy shuffles toward the best loot, eating everything it walks over. Ankhs give <b>+2 moves</b>. Diamonds make it <b>grow</b>: 3 💎 = 2×2, 7 = 3×3, 12 = 4×4 (each growth also gives +1 move). Bigger mummy, bigger bites. You start with 8 moves.</p>
     <table class="pay"><thead><tr><th></th><th>×3</th><th>×4</th><th>×5</th></tr></thead><tbody>${Object.keys(P).map((k) => payRow(icon[k], P[k], b, lb)).join('')}</tbody></table>
-    <p class="fine">Pays shown at your current bet. 20 fixed lines, left to right. Max win 5,000× bet. Simulated RTP ≈ 94%.</p>`;
+    <p class="fine">Pays shown at your current bet. 20 fixed lines, left to right. Max win 5,000× bet. Simulated RTP ≈ 96%.</p>`;
   },
   async play(res, x) {
-    let acc = 0;
     const b = x.bet();
-    for (let i = 0; i < res.spins.length; i++) {
-      const s = res.spins[i];
-      if (i === 1) {
-        x.sfx.feature();
-        await x.showOverlay(`<div class="feat"><small>BONUS</small><b>10 FREE SPINS</b><small>Coin collects doubled</small></div>`, 2000);
-        x.hideOverlay();
-        document.body.classList.add('in-feature');
-      }
-      if (i > 0) x.setWin(acc * b, `FREE SPIN ${i}/${res.fsAwarded}`);
-      const pyrBefore = (c) => s.grid.slice(0, c).flat().filter((z) => z.s === 'pyramid').length;
-      await x.spinTo(s.grid, { anticipation: (c) => c === 4 && pyrBefore(4) >= 2 });
-      if (s.wins.length) {
-        await x.showLineWins(s.wins);
-        acc += s.wins.reduce((a, w) => a + w.pay, 0);
-        x.setWin(acc * b, i ? `FREE SPIN ${i}/${res.fsAwarded}` : 'WIN');
-      }
-      if (s.collect > 0) {
-        const pos = [];
-        s.grid.forEach((col, c) => col.forEach((z, r) => { if (z.s === 'coin' || z.s === 'scarab') pos.push([c, r]); }));
-        x.highlight(pos);
-        x.sfx.win();
-        await x.showOverlay(`<div class="feat collect"><small>${s.scarabs > 1 ? `${s.scarabs} SCARABS ` : ''}COLLECT${i ? ' ×2' : ''}</small><b>${x.fmt(s.collect * b)}</b></div>`, 1500);
-        x.hideOverlay(); x.clearHighlight();
-        acc += s.collect;
-        x.setWin(acc * b, i ? `FREE SPIN ${i}/${res.fsAwarded}` : 'WIN');
-      }
-      if (s.scatterPay > 0) { acc += s.scatterPay; x.setWin(acc * b, 'WIN'); }
-      if (s.retrigger) { x.sfx.feature(); await x.showOverlay(`<div class="feat"><b>+${s.retrigger} SPINS</b></div>`, 1200); x.hideOverlay(); }
-      if (i > 0) await x.sleep(x.speed(250));
-      else if (s.pyramids >= 3) { const pos = []; s.grid.forEach((col, c) => col.forEach((z, r) => z.s === 'pyramid' && pos.push([c, r]))); x.highlight(pos); await x.sleep(900); x.clearHighlight(); }
+    const s = res.spins[0];
+    let acc = 0;
+    const pyrBefore = (c) => s.grid.slice(0, c).flat().filter((z) => z.s === 'pyramid').length;
+    await x.spinTo(s.grid, { anticipation: (c) => c === 4 && pyrBefore(4) >= 2 });
+    if (s.wins.length) {
+      await x.showLineWins(s.wins);
+      acc += s.wins.reduce((a, w) => a + w.pay, 0);
+      x.setWin(acc * b);
     }
-    document.body.classList.remove('in-feature');
+    if (s.collect > 0) {
+      const pos = [];
+      s.grid.forEach((col, c) => col.forEach((z, r) => { if (z.s === 'coin' || z.s === 'scarab') pos.push([c, r]); }));
+      x.highlight(pos);
+      x.sfx.win();
+      await x.showOverlay(`<div class="feat collect"><small>SCARAB COLLECT</small><b>${x.fmt(s.collect * b)}</b></div>`, 1500);
+      x.hideOverlay(); x.clearHighlight();
+      acc += s.collect;
+      x.setWin(acc * b);
+    }
+    if (s.scatterPay > 0) { acc += s.scatterPay; x.setWin(acc * b); }
+    if (!res.walk) return;
+    const pos = []; s.grid.forEach((col, c) => col.forEach((z, r) => z.s === 'pyramid' && pos.push([c, r])));
+    x.highlight(pos); await x.sleep(900); x.clearHighlight();
+    x.sfx.feature();
+    await x.showOverlay(`<div class="feat"><small>THE TOMB OPENS</small><b>MUMMY WALK</b><small>Eat 💎 to grow bigger</small></div>`, 2200);
+    x.hideOverlay();
+    await playMummyWalk(res.walk, x, acc);
   },
 };
+
+/* ---- Mummy Walk bonus board ---- */
+const MW_W = 6, MW_H = 5;
+const MW_GROW_AT = [0, 0, 3, 7, 12];
+function mwItem(it, b) {
+  if (it.t === 'coin') return `<div class="mw-item coin${it.l ? ' jp' : ''}"><span class="coin-face">${it.l || fmtShort(it.v * b)}</span></div>`;
+  if (it.t === 'diamond') return `<div class="mw-item dia"><span>💎</span></div>`;
+  return `<div class="mw-item ankh"><span>☥</span><em>+2</em></div>`;
+}
+async function playMummyWalk(walk, x, acc0) {
+  const b = x.bet();
+  document.body.classList.add('in-feature');
+  const el = x.showBonus(`
+    <div class="mw-hud">
+      <div><small>MOVES</small><b id="mw-moves">8</b></div>
+      <div class="mw-meter"><small>💎 <span id="mw-dia">0</span> · <span id="mw-next"></span></small><div class="bar"><i id="mw-fill"></i></div></div>
+      <div><small>BONUS</small><b id="mw-win">0</b></div>
+    </div>
+    <div class="mw-board" id="mw-board">
+      ${Array.from({ length: MW_H }, (_, yy) => Array.from({ length: MW_W }, (_, xx) => `<div class="mw-cell" data-x="${xx}" data-y="${yy}"></div>`).join('')).join('')}
+      <div class="mw-mummy" id="mw-mummy">${MUMMY_SVG}</div>
+      <div class="mw-pop" id="mw-pop"></div>
+    </div>`);
+  const cell = (cx, cy) => el.querySelector(`.mw-cell[data-x="${cx}"][data-y="${cy}"]`);
+  const mummy = el.querySelector('#mw-mummy');
+  let size = 1, diamonds = 0, shown = 0;
+  const place = (px, py, sz) => {
+    mummy.style.left = (px / MW_W) * 100 + '%';
+    mummy.style.top = (py / MW_H) * 100 + '%';
+    mummy.style.width = (sz / MW_W) * 100 + '%';
+    mummy.style.height = (sz / MW_H) * 100 + '%';
+    mummy.dataset.size = sz;
+  };
+  const meter = () => {
+    el.querySelector('#mw-dia').textContent = diamonds;
+    if (size >= 4) { el.querySelector('#mw-next').textContent = 'MAX SIZE'; el.querySelector('#mw-fill').style.width = '100%'; return; }
+    const lo = MW_GROW_AT[size] || 0, hi = MW_GROW_AT[size + 1];
+    el.querySelector('#mw-next').textContent = `${hi - diamonds} to grow`;
+    el.querySelector('#mw-fill').style.width = ((diamonds - lo) / (hi - lo)) * 100 + '%';
+  };
+  const winEl = el.querySelector('#mw-win');
+  const setBonusWin = (v) => { shown = v; winEl.textContent = x.fmt(v * b); x.setWin((acc0 + v) * b, 'MUMMY WALK'); };
+  const popText = (txt, px, py, cls = '') => {
+    const p = document.createElement('div');
+    p.className = 'mw-float ' + cls; p.textContent = txt;
+    p.style.left = ((px + 0.5) / MW_W) * 100 + '%'; p.style.top = ((py + 0.3) / MW_H) * 100 + '%';
+    el.querySelector('#mw-board').appendChild(p);
+    setTimeout(() => p.remove(), 1100);
+  };
+  // initial board
+  for (let i = 0; i < MW_W; i++) for (let j = 0; j < MW_H; j++) {
+    const it = walk.initial[i][j];
+    if (it) cell(i, j).innerHTML = mwItem(it, b);
+  }
+  place(walk.start.x, walk.start.y, 1);
+  el.querySelector('#mw-moves').textContent = 8;
+  meter();
+  await x.sleep(x.speed(900));
+  let running = 0;
+  for (const f of walk.frames) {
+    el.querySelector('#mw-moves').textContent = f.moves + 1;
+    // drops
+    for (const d of f.drops) { const c = cell(d.x, d.y); c.innerHTML = mwItem(d, b); c.firstElementChild.classList.add('in'); }
+    if (f.drops.length) { x.sfx.tick(); await x.sleep(x.speed(450)); }
+    el.querySelector('#mw-moves').textContent = f.moves;
+    const pending = f.collected.slice();
+    const eatAt = (px, py, sz) => {
+      for (let k = pending.length - 1; k >= 0; k--) {
+        const it = pending[k];
+        if (it.x >= px && it.x < px + sz && it.y >= py && it.y < py + sz) {
+          pending.splice(k, 1);
+          const c = cell(it.x, it.y);
+          c.firstElementChild?.classList.add('eaten');
+          setTimeout(() => (c.innerHTML = ''), 260);
+          if (it.t === 'coin') { running += it.v; popText('+' + (it.l || fmtShort(it.v * b)), it.x, it.y, it.l ? 'jp' : ''); x.sfx.tick(); }
+          else if (it.t === 'diamond') { diamonds++; popText('💎', it.x, it.y, 'dia'); x.sfx.stop(); }
+          else { popText('+2 MOVES', it.x, it.y, 'ankh'); x.sfx.win(); }
+        }
+      }
+      setBonusWin(running); meter();
+    };
+    let cx = null, cy = null;
+    for (const st of f.path) {
+      cx = st.x; cy = st.y;
+      place(cx, cy, size);
+      mummy.classList.remove('step'); void mummy.offsetWidth; mummy.classList.add('step');
+      await x.sleep(x.speed(300));
+      eatAt(cx, cy, size);
+    }
+    if (f.grew) {
+      size = f.size;
+      x.sfx.feature();
+      mummy.classList.add('grow');
+      place(f.x, f.y, size);
+      await x.showOverlay(`<div class="feat"><small>MUMMY GROWS!</small><b>${size}×${size}</b><small>+1 move</small></div>`, 1300);
+      x.hideOverlay();
+      mummy.classList.remove('grow');
+      eatAt(f.x, f.y, size);
+    }
+    running = f.total; diamonds = f.diamonds; setBonusWin(running); meter();
+    el.querySelector('#mw-moves').textContent = f.moves;
+    await x.sleep(x.speed(f.collected.length ? 350 : 200));
+  }
+  x.sfx.big();
+  await x.showOverlay(`<div class="feat"><small>MUMMY WALK COMPLETE</small><b>${x.fmt(walk.total * b)}</b></div>`, 2200);
+  x.hideOverlay();
+  x.hideBonus();
+  document.body.classList.remove('in-feature');
+}
 
 /* ================================================================== */
 const SS = { cake: '🎂', donut: '🍩', candy: '🍬', choco: '🍫', grape: '🍇', melon: '🍉', peach: '🍑', apple: '🍎' };
@@ -197,18 +301,20 @@ const gem = (k) => `<div class="gem" style="--g:${GEM[k]}"></div>`;
 const prismPop = {
   name: 'Prism Pop',
   blurb: 'Classic neon gem slot. Wins pay both ways, and star wilds expand and lock for a free respin.',
-  tags: ['Pays Both Ways', 'Expanding Wilds', 'Respins'],
-  tagline: 'Stars on reels 2–4 expand, lock and respin · 10 lines, both ways',
+  tags: ['Pays Both Ways', 'Expanding Wilds', 'Crystal Picks'],
+  tagline: 'Stars expand & respin · 3 prisms = Crystal Picks jackpot game',
   cover: `<div class="cover-row">${gem('purple')}<span class="star-face">✦</span>${gem('green')}</div>`,
   cols: 5, rows: 3,
   symName: (s) => ({ bar: 'BAR', seven: '7', star: 'Star' }[s] || s + ' gem'),
   randomCell(c) {
     const t = [['bar', 1.3], ['seven', 2.2], ['yellow', 4.5], ['green', 5], ['orange', 5.5], ['blue', 7], ['purple', 7]];
     if (c >= 1 && c <= 3) t.push(['star', 0.6]);
+    if (c % 2 === 0) t.push(['prism', 1.4]);
     return { s: pickW(t) };
   },
   renderCell(c) {
     if (c.s === 'star') return sym('wild star' + (c.x ? ' expanded' : ''), '<span class="star-face">✦</span>', 'WILD');
+    if (c.s === 'prism') return sym('scatter prism', '<span class="prism-face"></span>', 'BONUS');
     if (c.s === 'bar') return sym('bar', '<span class="bar-face">BAR</span>');
     if (c.s === 'seven') return sym('seven', '<span class="seven-face">7</span>');
     return sym('gemcell', gem(c.s));
@@ -219,7 +325,8 @@ const prismPop = {
     return `<h3>Prism Pop</h3>
     <p>10 fixed lines that pay <b>both ways</b> — left to right and right to left.</p>
     <p><b>✦ Star wilds</b> land on reels 2, 3 and 4. When one lands it <b>expands</b> to fill the reel, locks in place, and the other reels <b>respin</b> for free. Each new star earns another respin (up to 3).</p>
-    <table class="pay"><thead><tr><th></th><th>×3</th><th>×4</th><th>×5</th></tr></thead><tbody>${Object.keys(P).map((k) => payRow(icon[k] || gem(k), P[k].map((v) => v * 0.82), b, 1 / 10)).join('')}</tbody></table>
+    <p><b>3 Prisms</b> (reels 1, 3, 5) start <b>Crystal Picks</b>: tap crystals to reveal jackpots. Match 3 of the same to win it: <b>MINI</b> 10× · <b>MINOR</b> 25× · <b>MAJOR</b> 100× · <b>GRAND</b> 500× bet.</p>
+    <table class="pay"><thead><tr><th></th><th>×3</th><th>×4</th><th>×5</th></tr></thead><tbody>${Object.keys(P).map((k) => payRow(icon[k] || gem(k), P[k].map((v) => v * 0.72), b, 1 / 10)).join('')}</tbody></table>
     <p class="fine">Pays shown at your current bet. Low volatility. Simulated RTP ≈ 95%.</p>`;
   },
   async play(res, x) {
@@ -248,8 +355,68 @@ const prismPop = {
       held.forEach((r) => x.cells[r].forEach((el) => el.classList.add('locked')));
       if (i < res.spins.length - 1) await x.sleep(x.speed(400));
     }
+    if (res.picks) {
+      const pos = []; res.spins[0].grid.forEach((col, c) => col.forEach((z, r) => z.s === 'prism' && pos.push([c, r])));
+      x.highlight(pos); await x.sleep(900); x.clearHighlight();
+      x.sfx.feature();
+      await x.showOverlay(`<div class="feat"><small>3 PRISMS</small><b>CRYSTAL PICKS</b><small>Match 3 to win a jackpot</small></div>`, 2000);
+      x.hideOverlay();
+      await playCrystalPicks(res.picks, x, acc);
+    }
   },
 };
+
+/* ---- Crystal Picks bonus ---- */
+const JP = [['GRAND', 500], ['MAJOR', 100], ['MINOR', 25], ['MINI', 10]];
+async function playCrystalPicks(pk, x, acc0) {
+  const b = x.bet();
+  document.body.classList.add('in-feature');
+  const el = x.showBonus(`
+    <div class="cp-ladder">${JP.map(([k, v]) => `<div class="cp-rung ${k.toLowerCase()}" data-k="${k}"><b>${k}</b><span>${x.fmt(v * b)}</span><i class="pips"><u></u><u></u><u></u></i></div>`).join('')}</div>
+    <p class="cp-hint" id="cp-hint">${x.auto ? 'Auto-picking…' : 'Tap a crystal'}</p>
+    <div class="cp-grid">${Array.from({ length: 12 }, (_, i) => `<button class="cp-tile" data-i="${i}"><span class="cp-crystal"></span></button>`).join('')}</div>`);
+  const counts = {};
+  let step = 0;
+  const reveal = (tile, k, dim = false) => {
+    tile.classList.add('open', k.toLowerCase());
+    if (dim) tile.classList.add('dim');
+    tile.innerHTML = `<span class="cp-face"><b>${k}</b></span>`;
+    tile.disabled = true;
+  };
+  await new Promise((resolve) => {
+    const take = (tile) => {
+      if (step >= pk.sequence.length || tile.disabled) return;
+      const k = pk.sequence[step++];
+      reveal(tile, k);
+      counts[k] = (counts[k] || 0) + 1;
+      el.querySelector(`.cp-rung[data-k="${k}"] .pips u:nth-child(${counts[k]})`)?.classList.add('on');
+      x.sfx.tick();
+      if (step === pk.sequence.length) { el.querySelectorAll('.cp-tile').forEach((t) => (t.disabled = true)); resolve(); }
+    };
+    el.querySelectorAll('.cp-tile').forEach((t) => (t.onclick = () => take(t)));
+    const autoPick = async () => {
+      while (step < pk.sequence.length) {
+        if (!x.auto) { await x.sleep(300); continue; }
+        const open = [...el.querySelectorAll('.cp-tile:not(:disabled)')];
+        take(open[Math.floor(Math.random() * open.length)]);
+        await x.sleep(x.speed(450));
+      }
+    };
+    autoPick();
+  });
+  el.querySelector(`.cp-rung[data-k="${pk.jackpot}"]`).classList.add('won');
+  el.querySelectorAll('.cp-tile').forEach((t) => { if (t.classList.contains(pk.jackpot.toLowerCase())) t.classList.add('win'); });
+  el.querySelector('#cp-hint').textContent = `${pk.jackpot}!`;
+  await x.sleep(900);
+  const closed = [...el.querySelectorAll('.cp-tile:not(.open)')];
+  closed.forEach((t, i) => reveal(t, pk.rest[i] || 'MINI', true));
+  x.sfx.big();
+  x.setWin((acc0 + pk.value) * b, 'CRYSTAL PICKS');
+  await x.showOverlay(`<div class="feat"><small>${pk.jackpot} JACKPOT</small><b>${x.fmt(pk.value * b)}</b></div>`, 2300);
+  x.hideOverlay();
+  x.hideBonus();
+  document.body.classList.remove('in-feature');
+}
 
 /* ================================================================== */
 const THUNDER = { eagle: '🦅', horse: '🐎', trident: '🔱' };

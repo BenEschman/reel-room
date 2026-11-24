@@ -109,17 +109,87 @@ function wrSpin(rng, fs) {
   const win = sum(wins, (w) => w.pay) + collect + scatterPay;
   return { grid, wins, collect, scarabs, scatterPay, pyramids, win };
 }
-export function wrappedRiches(rng = cryptoRng) {
-  const spins = [wrSpin(rng, false)];
-  let fsLeft = 0, fsAwarded = 0;
-  if (spins[0].pyramids >= 3) fsLeft = fsAwarded = 10;
-  while (fsLeft > 0 && spins.length < 60) {
-    fsLeft--;
-    const s = wrSpin(rng, true);
-    if (s.pyramids >= 3) { fsLeft += 5; fsAwarded += 5; s.retrigger = 5; }
-    spins.push(s);
+// ---- Mummy Walk bonus: a mummy roams a 6x5 board eating coins & diamonds, growing as it goes
+export const MW_W = 6, MW_H = 5;
+const MW_GROW_AT = [0, 0, 3, 7, 12]; // total diamonds needed to reach size 2, 3, 4
+const MW_COINS = [
+  [{ v: 0.5 }, 30], [{ v: 1 }, 28], [{ v: 2 }, 18], [{ v: 3 }, 10],
+  [{ v: 5 }, 7], [{ v: 10 }, 4], [{ v: 25, l: 'MINI' }, 1], [{ v: 100, l: 'MAJOR' }, 0.15],
+];
+const MW = { coin: 0.078, diamond: 0.035, ankh: 0.008, startMoves: 8 };
+export function mummyWalk(rng = cryptoRng) {
+  const board = Array.from({ length: MW_W }, () => Array(MW_H).fill(null)); // board[x][y]
+  let size = 1, diamonds = 0, total = 0, moves = MW.startMoves;
+  let x = Math.floor(rng() * MW_W), y = Math.floor(rng() * MW_H);
+  const start = { x, y };
+  const under = (px, py, sz, f) => { for (let i = px; i < px + sz; i++) for (let j = py; j < py + sz; j++) f(i, j); };
+  const frames = [];
+  const eat = (px, py, sz, out) => under(px, py, sz, (i, j) => {
+    const it = board[i][j];
+    if (!it) return;
+    board[i][j] = null;
+    out.push({ x: i, y: j, ...it });
+    if (it.t === 'coin') total += it.v;
+    else if (it.t === 'diamond') diamonds++;
+    else if (it.t === 'ankh') moves += 2;
+  });
+  // seed the board
+  for (let i = 0; i < MW_W; i++) for (let j = 0; j < MW_H; j++) {
+    if (i === x && j === y) continue;
+    if (rng() < 0.22) board[i][j] = { t: 'coin', ...pick(rng, MW_COINS) };
   }
-  return { spins, fsAwarded, total: sum(spins, (s) => s.win) };
+  const initial = board.map((c) => c.map((it) => it && { ...it }));
+  while (moves > 0 && frames.length < 60) {
+    moves--;
+    // 1. new items drop on empty cells
+    const drops = [];
+    for (let i = 0; i < MW_W; i++) for (let j = 0; j < MW_H; j++) {
+      if (board[i][j] || (i >= x && i < x + size && j >= y && j < y + size)) continue;
+      const r = rng();
+      let it = null;
+      if (r < MW.coin) it = { t: 'coin', ...pick(rng, MW_COINS) };
+      else if (r < MW.coin + MW.diamond) it = { t: 'diamond' };
+      else if (r < MW.coin + MW.diamond + MW.ankh) it = { t: 'ankh' };
+      if (it) { board[i][j] = it; drops.push({ x: i, y: j, ...it }); }
+    }
+    // 2. pick the best spot within 2 steps
+    let best = null;
+    for (let nx = x - 2; nx <= x + 2; nx++) for (let ny = y - 2; ny <= y + 2; ny++) {
+      if (nx < 0 || ny < 0 || nx > MW_W - size || ny > MW_H - size) continue;
+      let sc = rng() * 0.3;
+      under(nx, ny, size, (i, j) => {
+        const it = board[i][j];
+        if (!it) return;
+        sc += it.t === 'coin' ? Math.min(it.v, 12) : it.t === 'diamond' ? (size < 4 ? 4 : 1) : 3;
+      });
+      if (!best || sc > best.sc) best = { nx, ny, sc };
+    }
+    // 3. walk there one step at a time, eating along the way
+    const path = [];
+    const collected = [];
+    while (x !== best.nx || y !== best.ny) {
+      x += Math.sign(best.nx - x); y += Math.sign(best.ny - y);
+      path.push({ x, y });
+      eat(x, y, size, collected);
+    }
+    // 4. grow
+    let grew = 0;
+    while (size < 4 && diamonds >= MW_GROW_AT[size + 1]) {
+      size++; grew++; moves += 1;
+      x = Math.min(x, MW_W - size); y = Math.min(y, MW_H - size);
+      eat(x, y, size, collected);
+    }
+    frames.push({ drops, path, x, y, size, collected, grew, moves, total, diamonds });
+  }
+  return { start, initial, frames, total };
+}
+
+export function wrappedRiches(rng = cryptoRng) {
+  const base = wrSpin(rng, false);
+  const spins = [base];
+  let walk = null;
+  if (base.pyramids >= 3) walk = mummyWalk(rng);
+  return { spins, walk, total: base.win + (walk ? walk.total : 0) };
 }
 
 /* ------------------------------------------------------------------ */
@@ -209,13 +279,31 @@ const PP_PAYS = scale({
   orange: [0,0,0,7,15,30],
   blue:   [0,0,0,5,10,14],
   purple: [0,0,0,5,10,14],
-}, 0.82);
-function ppCell(rng, reel) {
+}, 0.72);
+function ppCell(rng, reel, first = false) {
   const t = [
     ['bar', 1.3], ['seven', 2.2], ['yellow', 4.5], ['green', 5], ['orange', 5.5], ['blue', 7], ['purple', 7],
   ];
   if (reel >= 1 && reel <= 3) t.push(['star', 0.4]);
+  if (reel % 2 === 0 && first) t.push(['prism', PP_PRISM]);
   return { s: pick(rng, t) };
+}
+const PP_PRISM = 1.4;
+const PP_JACKPOTS = [['MINI', 10, 60], ['MINOR', 25, 28], ['MAJOR', 100, 10], ['GRAND', 500, 2]];
+export function crystalPicks(rng = cryptoRng) {
+  const win = pick(rng, PP_JACKPOTS.map((j) => [j, j[2]]));
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(rng() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; } return a; };
+  const pool = [win[0], win[0]];
+  for (const j of PP_JACKPOTS) if (j !== win) { const n = Math.floor(rng() * 3); for (let i = 0; i < n; i++) pool.push(j[0]); }
+  const sequence = [...shuffle(pool), win[0]];
+  const counts = {}; sequence.forEach((k) => (counts[k] = (counts[k] || 0) + 1));
+  const rest = [];
+  while (sequence.length + rest.length < 12) {
+    const opts = PP_JACKPOTS.filter((j) => j !== win && (counts[j[0]] || 0) < 2).map((j) => j[0]);
+    const k = opts.length ? opts[Math.floor(rng() * opts.length)] : win[0];
+    counts[k] = (counts[k] || 0) + 1; rest.push(k);
+  }
+  return { jackpot: win[0], value: win[1], sequence, rest: shuffle(rest), total: win[1] };
 }
 export function prismPop(rng = cryptoRng) {
   const held = [false, false, false, false, false];
@@ -225,7 +313,7 @@ export function prismPop(rng = cryptoRng) {
     const next = [];
     for (let r = 0; r < 5; r++) {
       if (held[r]) next.push(grid[r]);
-      else next.push([0, 1, 2].map(() => ppCell(rng, r)));
+      else next.push([0, 1, 2].map(() => ppCell(rng, r, i === 0)));
     }
     grid = next;
     let newWild = false;
@@ -241,7 +329,9 @@ export function prismPop(rng = cryptoRng) {
     spins.push({ grid: grid.map((c) => c.map((x) => ({ ...x }))), wins, expanded, win });
     if (!newWild) break; // a new expanding wild earns a respin
   }
-  return { spins, total: sum(spins, (s) => s.win) };
+  const prisms = spins[0].grid.flat().filter((c) => c.s === 'prism').length;
+  const picks = prisms >= 3 ? crystalPicks(rng) : null;
+  return { spins, prisms, picks, total: sum(spins, (s) => s.win) + (picks ? picks.total : 0) };
 }
 
 /* ------------------------------------------------------------------ */

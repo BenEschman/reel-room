@@ -128,6 +128,7 @@ async function enterApp() {
   $('auth').classList.add('hidden');
   $('app').classList.remove('hidden');
   updateBonus();
+  $('admin-btn').classList.toggle('hidden', !p.is_admin);
   if (!entered) { entered = true; route(); }
 }
 
@@ -153,6 +154,33 @@ $('bonus-btn').onclick = async () => {
   state.profile.last_bonus_at = new Date(new Date(data.next_at).getTime() - 4 * 3600e3).toISOString();
   setBalance(data.balance, true);
   updateBonus();
+};
+
+/* ---------------- admin: add coins ---------------- */
+$('admin-btn').onclick = () => {
+  modal(`<h3>Add coins</h3>
+    <form id="admin-form" class="admin-form">
+      <label>Player<input id="admin-user" value="${esc(state.profile.username)}" required /></label>
+      <label>Amount<input id="admin-amt" type="number" step="1" value="100000" required /></label>
+      <div class="quick">${[10000, 100000, 1000000, 10000000].map((v) => `<button type="button" class="btn small ghost" data-v="${v}">+${fmt(v)}</button>`).join('')}</div>
+      <button class="btn gold" type="submit">Add coins</button>
+      <p class="fine">Use a negative amount to take coins away. Every grant is logged.</p>
+      <p id="admin-msg" class="error"></p>
+    </form>`);
+  document.querySelectorAll('.quick [data-v]').forEach((b) => (b.onclick = () => ($('admin-amt').value = b.dataset.v)));
+  $('admin-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const user = $('admin-user').value.trim();
+    const amt = parseInt($('admin-amt').value, 10);
+    const { data, error } = await sb.rpc('admin_add_coins', { p_username: user, p_amount: amt });
+    if (error) {
+      $('admin-msg').textContent = /no_such_player/.test(error.message) ? 'No player with that name' : /not_admin/.test(error.message) ? 'Admins only' : 'Could not add coins';
+      return;
+    }
+    if (user.toLowerCase() === state.profile.username.toLowerCase()) { setBalance(data, true); state.profile.balance = data; }
+    $('modal').classList.add('hidden');
+    toast(`${amt > 0 ? '+' : ''}${fmt(amt)} coins → ${user} (now ${fmt(data)})`);
+  };
 };
 
 /* ---------------- leaderboard ---------------- */
@@ -194,6 +222,7 @@ function openGame(id) {
   $('game').classList.remove('hidden');
   $('game-title').textContent = g.name;
   $('feature-bar').textContent = g.tagline;
+  $('bonus').classList.add('hidden'); $('reels').classList.remove('hidden');
   buildReels(g.cols, g.rows);
   const start = Array.from({ length: g.cols }, (_, c) => Array.from({ length: g.rows }, () => g.randomCell(c)));
   setGrid(start);
@@ -328,6 +357,11 @@ const ctx = {
   sleep, speed, spinTo, setGrid, setCell, highlight, clearHighlight, showLineWins, lineCells,
   setWin, setWinNote, showOverlay, hideOverlay, sfx, fmt, bet,
   get cells() { return state.cells; },
+  get auto() { return state.autoLeft > 0; },
+  get turbo() { return state.turbo; },
+  bonusEl: $('bonus'),
+  showBonus(html) { $('reels').classList.add('hidden'); const b = $('bonus'); b.innerHTML = html; b.classList.remove('hidden'); return b; },
+  hideBonus() { $('bonus').classList.add('hidden'); $('bonus').innerHTML = ''; $('reels').classList.remove('hidden'); },
 };
 
 async function doSpin() {
