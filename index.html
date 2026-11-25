@@ -45,8 +45,21 @@
 
     <main id="lobby">
       <h2 class="hello">Hey <span id="hello-name"></span>, pick a machine</h2>
+      <h3 class="section">Slots</h3>
       <div class="games" id="game-list"></div>
+      <h3 class="section">Table games</h3>
+      <div class="games" id="table-list"></div>
       <p class="fine center">Play money only · no purchases · no cash value · RTP ≈ 95% (simulated over 1M spins)</p>
+    </main>
+
+    <main id="table" class="hidden">
+      <div class="game-head">
+        <button id="table-back" class="btn small ghost">← Lobby</button>
+        <h2 id="table-title"></h2>
+        <button id="table-info" class="btn small ghost">ⓘ Rules</button>
+      </div>
+      <div id="table-body"></div>
+      <div id="table-flash" class="table-flash hidden"></div>
     </main>
 
     <main id="game" class="hidden">

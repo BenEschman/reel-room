@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
 import { GAMES, LINES20, BUY } from './games.js';
+import { TABLES } from './tables-ui.js';
 
 const SUPABASE_URL = 'https://fnndsroudkrwrgnjgekr.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_g2mVr3w9WTpd5UrqsUrCIw_hDL6NOPO';
@@ -199,7 +200,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 /* ---------------- routing ---------------- */
 function route() {
   const id = location.hash.replace('#', '');
-  if (GAMES[id]) openGame(id); else openLobby();
+  if (GAMES[id]) openGame(id); else if (TABLES[id]) openTable(id); else openLobby();
 }
 window.addEventListener('hashchange', () => { if (!state.busy) route(); });
 $('home-btn').onclick = () => { if (!state.busy) location.hash = ''; };
@@ -209,7 +210,13 @@ function openLobby() {
   state.game = null; state.autoLeft = 0;
   document.body.className = '';
   $('game').classList.add('hidden');
+  $('table').classList.add('hidden'); $('table-body').innerHTML = '';
   $('lobby').classList.remove('hidden');
+  $('table-list').innerHTML = Object.entries(TABLES).map(([id, g]) => `
+    <a class="game-card table-card theme-${id}" href="#${id}">
+      <div class="gc-art">${g.cover}</div>
+      <div class="gc-body"><h3>${g.name}</h3><p>${g.blurb}</p><div class="chips">${g.tags.map((t) => `<span>${t}</span>`).join('')}</div></div>
+    </a>`).join('');
   $('game-list').innerHTML = Object.entries(GAMES).map(([id, g]) => `
     <a class="game-card theme-${id}" href="#${id}">
       <div class="gc-art">${g.cover}</div>
@@ -222,6 +229,7 @@ function openGame(id) {
   state.game = id;
   document.body.className = 'theme-' + id;
   $('lobby').classList.add('hidden');
+  $('table').classList.add('hidden'); $('table-body').innerHTML = '';
   $('game').classList.remove('hidden');
   $('game-title').textContent = g.name;
   $('feature-bar').textContent = g.tagline;
@@ -232,6 +240,48 @@ function openGame(id) {
   setWin(0, 'WIN');
   hideOverlay();
   renderBet();
+}
+
+/* ---------------- table games ---------------- */
+const TABLE_ERRORS = {
+  insufficient_balance: 'Not enough coins', hand_in_progress: 'Finish the current hand first', bet_out_of_range: 'Bet is outside the table limits',
+  over_table_limit: 'Over the table limit', odds_over_max: 'Odds are maxed', no_bets: 'Place a bet first', conflict: 'That move was already made. Refreshing the table.',
+  cannot_double: "Can't double here", cannot_split: "Can't split here", come_needs_point: 'Come bets need a point', line_bets_on_comeout_only: 'Line bets only on the come-out roll',
+};
+const tableCtx = {
+  fmt, sleep, toast,
+  sfx,
+  get turbo() { return state.turbo; },
+  async call(game, action, params = {}) {
+    try {
+      const { data, error } = await sb.functions.invoke('table', { body: { game, action, params } });
+      if (error) throw new Error(await fnError(error));
+      if (data?.error) throw new Error(data.error);
+      return data;
+    } catch (err) {
+      toast(TABLE_ERRORS[err.message] || 'Something went wrong. Try again.');
+      if (err.message === 'conflict') setTimeout(() => openTable(game), 600);
+      return null;
+    }
+  },
+  settle(balance) { if (typeof balance === 'number') { setBalance(balance, balance > state.balance); state.profile.balance = balance; } },
+  flash(text) {
+    const f = $('table-flash');
+    f.textContent = text; f.classList.remove('hidden'); f.style.animation = 'none'; void f.offsetWidth; f.style.animation = '';
+    clearTimeout(f._t); f._t = setTimeout(() => f.classList.add('hidden'), 1800);
+  },
+};
+function openTable(id) {
+  const t = TABLES[id];
+  state.game = null; state.autoLeft = 0;
+  document.body.className = 'table-mode theme-' + id;
+  $('lobby').classList.add('hidden');
+  $('game').classList.add('hidden');
+  $('table').classList.remove('hidden');
+  $('table-title').textContent = t.name;
+  $('table-info').onclick = () => modal(t.rules);
+  $('table-back').onclick = () => { location.hash = ''; };
+  t.mount($('table-body'), tableCtx);
 }
 
 /* ---------------- reels ---------------- */
